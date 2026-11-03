@@ -50,6 +50,8 @@ import java.util.concurrent.Future;
 public class ScimApacheConnector implements Connector {
 
     private static final Log LOG = Log.getLog(ScimApacheConnector.class);
+    private static final org.identityconnectors.common.logging.Log RAW_LOG =
+            org.identityconnectors.common.logging.Log.getLog(ScimApacheConnector.class);
 
     private final CloseableHttpClient httpClient;
 
@@ -94,6 +96,9 @@ public class ScimApacheConnector implements Connector {
                 }
                 var entity = response.getEntity();
                 byte[] responseBody = entity != null ? EntityUtils.toByteArray(entity) : new byte[0];
+                RAW_LOG.info("DEBUG raw {0} {1} status={2} requestHeaders={3} responseHeaders={4} bytes={5} body={6}",
+                        request.getMethod(), uri, response.getCode(), request.getRequestHeaders(),
+                        response.getHeaders(), responseBody.length, new String(responseBody, java.nio.charset.StandardCharsets.UTF_8));
                 // Read the body fully so the returned stream is independent of the (soon-closed)
                 // Apache response; otherwise Jersey reads a stream that is already closed.
                 clientResponse.setEntityStream(new ByteArrayInputStream(responseBody));
