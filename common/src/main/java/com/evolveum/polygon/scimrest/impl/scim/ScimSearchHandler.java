@@ -103,18 +103,30 @@ public class ScimSearchHandler implements FilterAwareExecuteQueryProcessor {
 
     private ConnectorObject deserializeFromRemote(GenericScimResource remoteObj) {
         var builder = objectClass.newObjectBuilder();
+        DEBUG_LOG.info("DEBUG deserialize {0} raw={1}", objectClass.objectClass().getObjectClassValue(), remoteObj.getObjectNode());
         for (var attributeDef : objectClass.attributes()) {
             var mapping = attributeDef.scim();
-            if (mapping != null) {
-                var value = mapping.valuesFromObject(remoteObj.getObjectNode());
-                if (value != null) {
-                    builder.addAttribute(attributeDef.attributeOf(value));
-                }
+            if (mapping == null) {
+                DEBUG_LOG.info("DEBUG deserialize: attribute {0} has NO scim mapping -> skipped", attributeDef.remoteName());
+                continue;
+            }
+            var value = mapping.valuesFromObject(remoteObj.getObjectNode());
+            if (value == null) {
+                DEBUG_LOG.info("DEBUG deserialize: attribute {0} (scim {1}) valuesFromObject=null -> skipped",
+                        attributeDef.remoteName(), mapping.path());
+            } else {
+                var attribute = attributeDef.attributeOf(value);
+                DEBUG_LOG.info("DEBUG deserialize: attribute {0} -> ConnId {1} values={2}",
+                        attributeDef.remoteName(), attribute.getName(), value);
+                builder.addAttribute(attribute);
             }
         }
         return builder.build();
 
     }
+
+    private static final org.identityconnectors.common.logging.Log DEBUG_LOG =
+            org.identityconnectors.common.logging.Log.getLog(ScimSearchHandler.class);
 
     @Override
     public boolean supports(Filter filter) {
@@ -147,6 +159,7 @@ public class ScimSearchHandler implements FilterAwareExecuteQueryProcessor {
         try {
             var remoteObj = scim.retrieveRequest(resource.relativeEndpoint(), uid.toString())
                     .invoke(GenericScimResource.class);
+            DEBUG_LOG.info("DEBUG performGet uid={0} got={1}", uid, remoteObj.getObjectNode());
             ConnectorObject obj = deserializeFromRemote(remoteObj);
             handler.handle(obj);
             BatchAwareResultHandler.batchFinished(handler);
