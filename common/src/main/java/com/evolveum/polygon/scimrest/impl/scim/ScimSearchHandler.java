@@ -157,8 +157,14 @@ public class ScimSearchHandler implements FilterAwareExecuteQueryProcessor {
         var resource = context.resourceForObjectClass(objectClass.objectClass());
 
         try {
-            var remoteObj = scim.retrieveRequest(resource.relativeEndpoint(), uid.toString())
-                    .invoke(GenericScimResource.class);
+            // Read the body as text and parse it with the SDK's own reader, so the JAX-RS provider choice
+            // cannot drop fields when the single object is bound to GenericScimResource.
+            var body = scim.retrieveRequest(resource.relativeEndpoint(), uid.toString())
+                    .invoke(String.class);
+            DEBUG_LOG.info("DEBUG performGet text body={0}", body);
+            var node = (tools.jackson.databind.node.ObjectNode) com.unboundid.scim2.common.utils.JsonUtils
+                    .getObjectReader().readTree(body);
+            var remoteObj = new GenericScimResource(node);
             DEBUG_LOG.info("DEBUG performGet uid={0} got={1}", uid, remoteObj.getObjectNode());
             ConnectorObject obj = deserializeFromRemote(remoteObj);
             handler.handle(obj);
