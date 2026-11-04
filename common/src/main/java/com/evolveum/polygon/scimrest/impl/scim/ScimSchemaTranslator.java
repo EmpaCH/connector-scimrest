@@ -21,6 +21,7 @@ import com.evolveum.polygon.scimrest.schema.strategy.ScimMembershipReferenceRule
 import com.evolveum.polygon.scimrest.schema.strategy.ScimMutabilityToCrudRule;
 import com.evolveum.polygon.scimrest.schema.strategy.ScimNameDetectionRule;
 import com.evolveum.polygon.scimrest.schema.strategy.ScimTypeToJsonTypeRule;
+import com.evolveum.polygon.conndev.api.AttributePath;
 import com.evolveum.polygon.scimrest.schema.strategy.ScimUidDetectionRule;
 import com.unboundid.scim2.common.types.AttributeDefinition;
 import com.unboundid.scim2.common.types.ResourceTypeResource;
@@ -156,8 +157,45 @@ public class ScimSchemaTranslator {
         // attributes carry SCIM paths that pass must resolve.
         populateFlattenedExtensionAttributes(scim, objectClass);
 
+        // Simple attributes of the extensions listed in the connector configuration. They carry
+        // SCIM paths too, so the path-based pass below takes their type and rules.
+        populateConfiguredExtensionAttributes(scim, objectClass);
+
         // Path-based attributes from Groovy definitions
         populatePathBasedSchema(scim, objectClass);
+    }
+
+    /**
+     * Adds the simple attributes of the extensions listed in the connector configuration
+     * ({@code scimExtensions}). Each attribute is named after its SCIM attribute and mapped to
+     * {@code [extension URI]:<attribute>}.
+     */
+    private void populateConfiguredExtensionAttributes(ScimResourceContext scim,
+                                                       RestObjectClassDefinitionBuilder objectClass) {
+        // Translators built without a connector configuration (unit tests) add no configured extensions.
+        var configured = globalConfiguration != null ? globalConfiguration.getScimExtensions() : new String[0];
+        for (var extensionUri : configured) {
+            var extensionSchema = scim.extensions().get(extensionUri);
+            if (extensionSchema == null) {
+                throw new ConfigurationException(String.format(
+                        "SCIM extension '%s' is configured, but it is not part of resource '%s'",
+                        extensionUri, scim.resource().getName()));
+            }
+            for (var scimAttr : extensionSchema.getAttributes()) {
+                if (AttributeDefinition.Type.COMPLEX.equals(scimAttr.getType())) {
+                    continue;
+                }
+                if (!objectClass.findAttributes(a -> scimAttr.getName().equals(a.name())).isEmpty()) {
+                    throw new ConfigurationException(String.format(
+                            "Object class '%s' cannot add '%s' from extension '%s': an attribute with that name is already defined",
+                            objectClass.objectClass().getObjectClassValue(), scimAttr.getName(), extensionUri));
+                }
+                var path = new AttributePath(List.of(
+                        new AttributePath.Extension(extensionUri),
+                        new AttributePath.Attribute(scimAttr.getName())));
+                objectClass.attribute(scimAttr.getName()).scim().path(path);
+            }
+        }
     }
 
     /**

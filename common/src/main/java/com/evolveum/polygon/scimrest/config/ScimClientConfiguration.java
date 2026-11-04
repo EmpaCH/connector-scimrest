@@ -53,6 +53,15 @@ public interface ScimClientConfiguration extends ConfigurationMixin {
     }
 
     /**
+     * SCIM extension schema URIs whose simple (non-complex) attributes become attributes of every
+     * object class of the resource, e.g. {@code urn:empa:params:scim:schemas:extension:telephony:2.0:User}.
+     * Complex attributes of an extension are not added; they need an explicit flatten declaration.
+     */
+    default String[] getScimExtensions() {
+        return new String[0];
+    }
+
+    /**
      * HTTP Basic authorization — legacy interface, prefer {@link BasicAuthorization}.
      *
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7617">RFC 7617 — The 'Basic' HTTP Authentication Scheme</a>

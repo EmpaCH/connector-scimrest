@@ -24,6 +24,7 @@ public class ScimGenericConfiguration extends ReadOnlyConfiguration {
     private Boolean flattenEmails;
     private Boolean flattenPhoneNumbers;
     private Boolean flattenAddresses;
+    private String[] scimExtensions;
 
     @Override
     @ConfigurationProperty(groupMessageKey = "scim.mapping", order = 810, required = false)
@@ -63,5 +64,15 @@ public class ScimGenericConfiguration extends ReadOnlyConfiguration {
 
     public void setScimFlattenAddresses(Boolean flattenAddresses) {
         this.flattenAddresses = flattenAddresses;
+    }
+
+    @Override
+    @ConfigurationProperty(groupMessageKey = "scim.mapping", order = 850, required = false)
+    public String[] getScimExtensions() {
+        return scimExtensions != null ? scimExtensions.clone() : new String[0];
+    }
+
+    public void setScimExtensions(String[] scimExtensions) {
+        this.scimExtensions = scimExtensions != null ? scimExtensions.clone() : null;
     }
 }

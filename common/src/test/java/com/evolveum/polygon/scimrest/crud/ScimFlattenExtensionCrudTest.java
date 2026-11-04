@@ -88,6 +88,14 @@ public class ScimFlattenExtensionCrudTest extends WireMockTestSupport {
                   "name": "EnterpriseUser",
                   "attributes": [
                     {
+                      "name": "employeeNumber",
+                      "type": "string",
+                      "mutability": "readWrite",
+                      "returned": "default",
+                      "required": false,
+                      "multiValued": false
+                    },
+                    {
                       "name": "department",
                       "type": "complex",
                       "mutability": "readWrite",
@@ -182,6 +190,7 @@ public class ScimFlattenExtensionCrudTest extends WireMockTestSupport {
                           "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"],
               "id": "1",
               "userName": "jdoe",
+              "employeeNumber": "E42",
               "department": {
                 "code": "ENG",
                 "name": "Engineering"
@@ -351,5 +360,41 @@ public class ScimFlattenExtensionCrudTest extends WireMockTestSupport {
 
     private static ObjectNode parse(LoggedRequest request) {
         return (ObjectNode) MAPPER.readTree(request.getBody());
+    }
+
+    /** Subclass that turns on the configured extension ({@code scimExtensions}) for one test. */
+    private static class ExtensionConfiguration extends TestConfiguration {
+
+        ExtensionConfiguration(int port) {
+            super(port);
+        }
+
+        @Override
+        public String[] getScimExtensions() {
+            return new String[] { ENTERPRISE_URI };
+        }
+    }
+
+    /**
+     * A simple (non-complex) attribute of a configured extension is a plain attribute of the object
+     * class, read from the resource's top level without any flatten declaration.
+     */
+    @Test
+    public void configuredExtensionSimpleAttributeIsAnAttribute() {
+        stubDiscovery();
+        wireMockServer.stubFor(get(urlPathEqualTo(USERS_ENDPOINT))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Type", "application/scim+json")
+                        .withBody(SEARCH_RESPONSE)));
+
+        var connector = new ScriptConnector(null, SCHEMA_SCRIPT, null);
+        connector.init(new ExtensionConfiguration(wireMockServer.port()));
+        var results = new ArrayList<ConnectorObject>();
+        connector.executeQuery(new ObjectClass("User"), null,
+                o -> { results.add(o); return true; },
+                new OperationOptionsBuilder().build());
+
+        assertEquals(results.size(), 1);
+        assertEquals(AttributeUtil.getSingleValue(results.getFirst().getAttributeByName("employeeNumber")), "E42");
     }
 }
